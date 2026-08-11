@@ -1,0 +1,40 @@
+@IdeasApi_HostAddress = http://localhost:5016
+
+POST {{IdeasApi_HostAddress}}/idea
+Content-Type: application/json
+
+{
+  "title": "My first idea",
+  "description": "Build a level 2 REST API"
+}
+
+###
+
+GET {{IdeasApi_HostAddress}}/idea
+
+###
+
+GET {{IdeasApi_HostAddress}}/idea/1
+
+###
+
+PUT {{IdeasApi_HostAddress}}/idea/1
+Content-Type: application/json
+
+{
+  "title": "Updated idea",
+  "description": "Fully replaced description"
+}
+
+###
+
+PATCH {{IdeasApi_HostAddress}}/idea/1
+Content-Type: application/json
+
+{
+  "title": "Partially updated title"
+}
+
+###
+
+DELETE {{IdeasApi_HostAddress}}/idea/1

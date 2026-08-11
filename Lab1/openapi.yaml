@@ -1,0 +1,258 @@
+openapi: 3.0.3
+info:
+  title: Retro Video Game Exchange API
+  description: RMM Level 3 API for trading retro games. JWT required except register and login.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5130
+
+paths:
+  /api/users:
+    post:
+      summary: Register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, streetAddress]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+                streetAddress: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '409':
+          description: Email already used
+
+  /api/auth/login:
+    post:
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+        '401':
+          description: Invalid credentials
+
+  /api/users/{userId}:
+    get:
+      summary: Get user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Not found
+    put:
+      summary: Update own name and address
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, streetAddress]
+              properties:
+                name: { type: string }
+                streetAddress: { type: string }
+      responses:
+        '204':
+          description: Updated
+        '403':
+          description: Not your profile
+        '404':
+          description: Not found
+
+  /api/games:
+    get:
+      summary: Search games
+      parameters:
+        - name: name
+          in: query
+          schema: { type: string }
+        - name: ownerId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameList'
+    post:
+      summary: Create game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameBody'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+
+  /api/games/{gameId}:
+    get:
+      summary: Get game
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '404':
+          description: Not found
+    put:
+      summary: Update own game
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameBody'
+      responses:
+        '204':
+          description: Updated
+        '403':
+          description: Not your game
+        '404':
+          description: Not found
+    delete:
+      summary: Delete own game
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '204':
+          description: Deleted
+        '403':
+          description: Not your game
+        '404':
+          description: Not found
+
+components:
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    Link:
+      type: object
+      properties:
+        rel: { type: string }
+        href: { type: string }
+        method: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        streetAddress: { type: string }
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+    GameBody:
+      type: object
+      required: [name, publisher, yearPublished, gamingSystem, condition]
+      properties:
+        name: { type: string }
+        publisher: { type: string }
+        yearPublished: { type: integer }
+        gamingSystem: { type: string }
+        condition:
+          type: string
+          enum: [mint, good, fair, poor]
+        previousOwners:
+          type: integer
+          nullable: true
+    Game:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        publisher: { type: string }
+        yearPublished: { type: integer }
+        gamingSystem: { type: string }
+        condition: { type: string }
+        previousOwners:
+          type: integer
+          nullable: true
+        ownerId: { type: integer }
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+    GameList:
+      type: object
+      properties:
+        games:
+          type: array
+          items:
+            $ref: '#/components/schemas/Game'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+
+security:
+  - Bearer: []

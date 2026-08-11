@@ -1,0 +1,497 @@
+openapi: 3.0.3
+info:
+  title: Video Game Exchange API
+  description: |
+    RESTful API for a video game exchange platform (RMM Level 2).
+    Users list games they want to exchange and manage profile resources
+    with standard HTTP methods and status codes.
+  version: 1.0.0
+servers:
+  - url: https://api.videogameexchange.example.com/v1
+    description: Production
+  - url: http://localhost:8080/v1
+    description: Local development
+
+tags:
+  - name: Games
+    description: Games listed for exchange
+  - name: Users
+    description: Platform users
+
+paths:
+  /games:
+    post:
+      tags:
+        - Games
+      summary: Add a new game to the exchange list
+      operationId: createGame
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameCreate'
+            example:
+              title: The Legend of Zelda: Breath of the Wild
+              platform: Nintendo Switch
+              condition: Good
+              ownerUserId: 42
+              description: CIB, light wear on case
+              askingFor: Super Mario Odyssey
+      responses:
+        '201':
+          description: Game created
+          headers:
+            Location:
+              description: URI of the created game
+              schema:
+                type: string
+                example: /games/123
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /games/{gameId}:
+    parameters:
+      - $ref: '#/components/parameters/GameId'
+    put:
+      tags:
+        - Games
+      summary: Replace all properties of a game
+      operationId: replaceGame
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameReplace'
+            example:
+              title: The Legend of Zelda: Breath of the Wild
+              platform: Nintendo Switch
+              condition: Fair
+              ownerUserId: 42
+              description: Disc only
+              askingFor: Any Switch RPG
+              status: available
+      responses:
+        '200':
+          description: Game fully replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Games
+      summary: Partially update a game
+      operationId: patchGame
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GamePatch'
+            example:
+              condition: Like New
+              status: pending
+      responses:
+        '200':
+          description: Game partially updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Games
+      summary: Remove a game from the exchange list
+      operationId: deleteGame
+      responses:
+        '204':
+          description: Game deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users:
+    post:
+      tags:
+        - Users
+      summary: Create a new user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+            example:
+              username: gamer_alex
+              email: alex@example.com
+              displayName: Alex
+              city: Denver
+              state: CO
+      responses:
+        '201':
+          description: User created
+          headers:
+            Location:
+              description: URI of the created user
+              schema:
+                type: string
+                example: /users/42
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags:
+        - Users
+      summary: Replace all properties of a user
+      operationId: replaceUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserReplace'
+            example:
+              username: gamer_alex
+              email: alex@example.com
+              displayName: Alex River
+              city: Boulder
+              state: CO
+              bio: Casual collector, prefers local trades
+      responses:
+        '200':
+          description: User fully replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+        - Users
+      summary: Partially update a user
+      operationId: patchUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPatch'
+            example:
+              city: Fort Collins
+              bio: Looking for co-op multiplayer games
+      responses:
+        '200':
+          description: User partially updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - Users
+      summary: Remove a user
+      operationId: deleteUser
+      responses:
+        '204':
+          description: User deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      description: Unique identifier of the game
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 123
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Unique identifier of the user
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 42
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    GameCondition:
+      type: string
+      enum:
+        - New
+        - Like New
+        - Good
+        - Fair
+        - Poor
+    GameStatus:
+      type: string
+      enum:
+        - available
+        - pending
+        - traded
+    Game:
+      type: object
+      required:
+        - id
+        - title
+        - platform
+        - condition
+        - ownerUserId
+        - status
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          example: 123
+        title:
+          type: string
+          example: The Legend of Zelda: Breath of the Wild
+        platform:
+          type: string
+          example: Nintendo Switch
+        condition:
+          $ref: '#/components/schemas/GameCondition'
+        ownerUserId:
+          type: integer
+          format: int64
+          example: 42
+        description:
+          type: string
+          example: CIB, light wear on case
+        askingFor:
+          type: string
+          description: What the owner wants in return
+          example: Super Mario Odyssey
+        status:
+          $ref: '#/components/schemas/GameStatus'
+    GameCreate:
+      type: object
+      required:
+        - title
+        - platform
+        - condition
+        - ownerUserId
+      properties:
+        title:
+          type: string
+        platform:
+          type: string
+        condition:
+          $ref: '#/components/schemas/GameCondition'
+        ownerUserId:
+          type: integer
+          format: int64
+        description:
+          type: string
+        askingFor:
+          type: string
+    GameReplace:
+      type: object
+      required:
+        - title
+        - platform
+        - condition
+        - ownerUserId
+        - status
+      properties:
+        title:
+          type: string
+        platform:
+          type: string
+        condition:
+          $ref: '#/components/schemas/GameCondition'
+        ownerUserId:
+          type: integer
+          format: int64
+        description:
+          type: string
+        askingFor:
+          type: string
+        status:
+          $ref: '#/components/schemas/GameStatus'
+    GamePatch:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+        platform:
+          type: string
+        condition:
+          $ref: '#/components/schemas/GameCondition'
+        ownerUserId:
+          type: integer
+          format: int64
+        description:
+          type: string
+        askingFor:
+          type: string
+        status:
+          $ref: '#/components/schemas/GameStatus'
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - displayName
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          example: 42
+        username:
+          type: string
+          example: gamer_alex
+        email:
+          type: string
+          format: email
+          example: alex@example.com
+        displayName:
+          type: string
+          example: Alex
+        city:
+          type: string
+          example: Denver
+        state:
+          type: string
+          example: CO
+        bio:
+          type: string
+          example: Casual collector
+    UserCreate:
+      type: object
+      required:
+        - username
+        - email
+        - displayName
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        bio:
+          type: string
+    UserReplace:
+      type: object
+      required:
+        - username
+        - email
+        - displayName
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        bio:
+          type: string
+    UserPatch:
+      type: object
+      minProperties: 1
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        bio:
+          type: string
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Resource not found
+        code:
+          type: string
+          example: NOT_FOUND

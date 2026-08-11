@@ -1,0 +1,76 @@
+@host = http://localhost:5130
+@token = replace-with-jwt
+
+###
+POST {{host}}/api/users
+Content-Type: application/json
+
+{
+  "name": "Alex Trader",
+  "email": "alex@example.com",
+  "password": "secret12",
+  "streetAddress": "123 Main St, Denver, CO"
+}
+
+###
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alex@example.com",
+  "password": "secret12"
+}
+
+###
+GET {{host}}/api/users/1
+Authorization: Bearer {{token}}
+
+###
+PUT {{host}}/api/users/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Alex R. Trader",
+  "streetAddress": "456 Oak Ave, Boulder, CO"
+}
+
+###
+POST {{host}}/api/games
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Super Mario Bros.",
+  "publisher": "Nintendo",
+  "yearPublished": 1985,
+  "gamingSystem": "NES",
+  "condition": "good",
+  "previousOwners": 1
+}
+
+###
+GET {{host}}/api/games?name=Mario
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/games/1
+Authorization: Bearer {{token}}
+
+###
+PUT {{host}}/api/games/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Super Mario Bros.",
+  "publisher": "Nintendo",
+  "yearPublished": 1985,
+  "gamingSystem": "NES",
+  "condition": "mint",
+  "previousOwners": 1
+}
+
+###
+DELETE {{host}}/api/games/1
+Authorization: Bearer {{token}}
