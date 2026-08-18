@@ -22,6 +22,11 @@ public static class ApiEndpoints
         app.MapPut("/api/games/{gameId:int}", UpdateGame).RequireAuthorization();
         app.MapDelete("/api/games/{gameId:int}", DeleteGame).RequireAuthorization();
         app.MapGet("/api/games", SearchGames).RequireAuthorization();
+
+        app.MapPost("/api/trade-offers", CreateTradeOffer).RequireAuthorization();
+        app.MapGet("/api/trade-offers/{offerId:int}", GetTradeOffer).RequireAuthorization();
+        app.MapPut("/api/trade-offers/{offerId:int}", UpdateTradeOfferStatus).RequireAuthorization();
+        app.MapGet("/api/trade-offers", SearchTradeOffers).RequireAuthorization();
     }
 
     private static string Base(HttpRequest request) =>
@@ -46,6 +51,14 @@ public static class ApiEndpoints
         new Link { Rel = "games", Href = $"{baseUrl}/api/games", Method = "GET" }
     ];
 
+    private static List<Link> TradeOfferLinks(int offerId, int offeredGameId, int requestedGameId, string baseUrl) =>
+    [
+        new Link { Rel = "self", Href = $"{baseUrl}/api/trade-offers/{offerId}", Method = "GET" },
+        new Link { Rel = "respond", Href = $"{baseUrl}/api/trade-offers/{offerId}", Method = "PUT" },
+        new Link { Rel = "offeredGame", Href = $"{baseUrl}/api/games/{offeredGameId}", Method = "GET" },
+        new Link { Rel = "requestedGame", Href = $"{baseUrl}/api/games/{requestedGameId}", Method = "GET" }
+    ];
+
     private static UserResponse ToUser(User user, string baseUrl) =>
         new(user.Id, user.Name, user.Email, user.StreetAddress, UserLinks(user.Id, baseUrl));
 
@@ -60,6 +73,17 @@ public static class ApiEndpoints
             game.PreviousOwners,
             game.OwnerId,
             GameLinks(game.Id, game.OwnerId, baseUrl));
+
+    private static TradeOfferResponse ToTradeOffer(TradeOffer offer, int recipientUserId, string baseUrl) =>
+        new(
+            offer.Id,
+            offer.OfferedGameId,
+            offer.RequestedGameId,
+            offer.OfferingUserId,
+            recipientUserId,
+            offer.Status.ToString().ToLowerInvariant(),
+            offer.CreatedAt,
+            TradeOfferLinks(offer.Id, offer.OfferedGameId, offer.RequestedGameId, baseUrl));
 
     private static async Task<IResult> Register(RegisterRequest body, AppDbContext db, HttpRequest request)
     {
@@ -253,5 +277,135 @@ public static class ApiEndpoints
         return Results.Ok(new GameListResponse(
             items,
             [new Link { Rel = "self", Href = self, Method = "GET" }]));
+    }
+
+    private static async Task<IResult> CreateTradeOffer(
+        TradeOfferRequest body,
+        AppDbContext db,
+        ClaimsPrincipal principal,
+        HttpRequest request)
+    {
+        var offeringUserId = principal.GetUserId();
+
+        var offeredGame = await db.Games.FindAsync(body.OfferedGameId);
+        if (offeredGame is null)
+            return Error(404, "Not Found", $"Game {body.OfferedGameId} was not found.");
+
+        if (offeredGame.OwnerId != offeringUserId)
+            return Error(403, "Forbidden", "You may only offer games you own.");
+
+        var requestedGame = await db.Games.FindAsync(body.RequestedGameId);
+        if (requestedGame is null)
+            return Error(404, "Not Found", $"Game {body.RequestedGameId} was not found.");
+
+        if (requestedGame.OwnerId == offeringUserId)
+            return Error(400, "Bad Request", "You cannot request a trade for your own game.");
+
+        var offer = new TradeOffer
+        {
+            OfferedGameId = offeredGame.Id,
+            RequestedGameId = requestedGame.Id,
+            OfferingUserId = offeringUserId,
+            Status = TradeOfferStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.TradeOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        var baseUrl = Base(request);
+        return Results.Created(
+            $"{baseUrl}/api/trade-offers/{offer.Id}",
+            ToTradeOffer(offer, requestedGame.OwnerId, baseUrl));
+    }
+
+    private static async Task<IResult> GetTradeOffer(
+        int offerId,
+        AppDbContext db,
+        ClaimsPrincipal principal,
+        HttpRequest request)
+    {
+        var offer = await db.TradeOffers.FindAsync(offerId);
+        if (offer is null)
+            return Error(404, "Not Found", $"Trade offer {offerId} was not found.");
+
+        var requestedGame = await db.Games.FindAsync(offer.RequestedGameId);
+        if (requestedGame is null)
+            return Error(404, "Not Found", $"Trade offer {offerId} was not found.");
+
+        var userId = principal.GetUserId();
+        if (userId != offer.OfferingUserId && userId != requestedGame.OwnerId)
+            return Error(403, "Forbidden", "You may only view trade offers you are involved in.");
+
+        return Results.Ok(ToTradeOffer(offer, requestedGame.OwnerId, Base(request)));
+    }
+
+    private static async Task<IResult> UpdateTradeOfferStatus(
+        int offerId,
+        TradeOfferStatusUpdateRequest body,
+        AppDbContext db,
+        ClaimsPrincipal principal)
+    {
+        var offer = await db.TradeOffers.FindAsync(offerId);
+        if (offer is null)
+            return Error(404, "Not Found", $"Trade offer {offerId} was not found.");
+
+        var requestedGame = await db.Games.FindAsync(offer.RequestedGameId);
+        if (requestedGame is null)
+            return Error(404, "Not Found", $"Trade offer {offerId} was not found.");
+
+        if (principal.GetUserId() != requestedGame.OwnerId)
+            return Error(403, "Forbidden", "Only the recipient of the offer may respond to it.");
+
+        if (body.Status != TradeOfferStatus.Accepted && body.Status != TradeOfferStatus.Rejected)
+            return Error(400, "Bad Request", "Status must be accepted or rejected.");
+
+        if (offer.Status != TradeOfferStatus.Pending)
+            return Error(409, "Conflict", "This offer has already been responded to.");
+
+        offer.Status = body.Status;
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> SearchTradeOffers(
+        AppDbContext db,
+        ClaimsPrincipal principal,
+        HttpRequest request,
+        string? status = null,
+        string? direction = null)
+    {
+        TradeOfferStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<TradeOfferStatus>(status, ignoreCase: true, out var value))
+                return Error(400, "Bad Request", "Status must be pending, accepted, or rejected.");
+            parsedStatus = value;
+        }
+
+        var userId = principal.GetUserId();
+
+        var query =
+            from offer in db.TradeOffers
+            join requestedGame in db.Games on offer.RequestedGameId equals requestedGame.Id
+            select new { Offer = offer, RecipientUserId = requestedGame.OwnerId };
+
+        query = direction switch
+        {
+            "incoming" => query.Where(x => x.RecipientUserId == userId),
+            "outgoing" => query.Where(x => x.Offer.OfferingUserId == userId),
+            _ => query.Where(x => x.Offer.OfferingUserId == userId || x.RecipientUserId == userId)
+        };
+
+        if (parsedStatus is not null)
+            query = query.Where(x => x.Offer.Status == parsedStatus);
+
+        var baseUrl = Base(request);
+        var rows = await query.OrderByDescending(x => x.Offer.CreatedAt).ToListAsync();
+        var items = rows.Select(x => ToTradeOffer(x.Offer, x.RecipientUserId, baseUrl)).ToList();
+
+        return Results.Ok(new TradeOfferListResponse(
+            items,
+            [new Link { Rel = "self", Href = $"{baseUrl}/api/trade-offers", Method = "GET" }]));
     }
 }

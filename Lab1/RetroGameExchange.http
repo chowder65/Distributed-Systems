@@ -74,3 +74,30 @@ Content-Type: application/json
 ###
 DELETE {{host}}/api/games/1
 Authorization: Bearer {{token}}
+
+###
+POST {{host}}/api/trade-offers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "offeredGameId": 1,
+  "requestedGameId": 2
+}
+
+###
+GET {{host}}/api/trade-offers?direction=incoming&status=pending
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/trade-offers/1
+Authorization: Bearer {{token}}
+
+###
+PUT {{host}}/api/trade-offers/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "accepted"
+}

@@ -7,6 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Game> Games => Set<Game>();
+    public DbSet<TradeOffer> TradeOffers => Set<TradeOffer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany(u => u.Games)
                 .HasForeignKey(g => g.OwnerId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TradeOffer>(entity =>
+        {
+            entity.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(t => t.OfferedGame)
+                .WithMany()
+                .HasForeignKey(t => t.OfferedGameId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(t => t.RequestedGame)
+                .WithMany()
+                .HasForeignKey(t => t.RequestedGameId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(t => t.OfferingUser)
+                .WithMany()
+                .HasForeignKey(t => t.OfferingUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

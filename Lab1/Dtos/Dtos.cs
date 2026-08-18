@@ -41,3 +41,19 @@ public record GameResponse(
     List<Link> Links);
 
 public record GameListResponse(List<GameResponse> Games, List<Link> Links);
+
+public record TradeOfferRequest(int OfferedGameId, int RequestedGameId);
+
+public record TradeOfferStatusUpdateRequest(TradeOfferStatus Status);
+
+public record TradeOfferResponse(
+    int Id,
+    int OfferedGameId,
+    int RequestedGameId,
+    int OfferingUserId,
+    int RecipientUserId,
+    string Status,
+    DateTime CreatedAt,
+    List<Link> Links);
+
+public record TradeOfferListResponse(List<TradeOfferResponse> Offers, List<Link> Links);

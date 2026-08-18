@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RetroGameExchange.Data;
@@ -17,17 +18,29 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 });
 
-var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
-    ?? throw new InvalidOperationException("Jwt configuration is missing.");
-if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
-    throw new InvalidOperationException("Jwt:Key must be at least 32 characters.");
+var jwtKey = builder.Configuration["JwtKey"]
+    ?? throw new InvalidOperationException("JwtKey is missing.");
+if (jwtKey.Length < 32)
+    throw new InvalidOperationException("JwtKey must be at least 32 characters.");
+
+var jwtSettings = new JwtSettings
+{
+    Key = jwtKey,
+    Issuer = builder.Configuration["JwtIssuer"]
+        ?? throw new InvalidOperationException("JwtIssuer is missing."),
+    Audience = builder.Configuration["JwtAudience"]
+        ?? throw new InvalidOperationException("JwtAudience is missing."),
+    ExpiresMinutes = builder.Configuration.GetValue("JwtExpiresMinutes", 120)
+};
 
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton<TokenService>();
 
+var connectionString = builder.Configuration["ConnectionStringDefault"]
+    ?? throw new InvalidOperationException("ConnectionStringDefault is missing.");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Default")
-        ?? "Data Source=retrogameexchange.db"));
+    options.UseSqlite(connectionString));
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -71,7 +84,11 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    try
+    {
+        db.Database.EnsureCreated();
+    }
+    catch (SqliteException) { }
 }
 
 if (app.Environment.IsDevelopment())

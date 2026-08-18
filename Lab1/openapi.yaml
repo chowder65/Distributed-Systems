@@ -188,6 +188,94 @@ paths:
         '404':
           description: Not found
 
+  /api/trade-offers:
+    get:
+      summary: Search your trade offers
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, accepted, rejected] }
+        - name: direction
+          in: query
+          schema: { type: string, enum: [incoming, outgoing] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeOfferList'
+    post:
+      summary: Create a trade offer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeOfferBody'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeOffer'
+        '400':
+          description: Cannot request a trade for your own game
+        '403':
+          description: Not your offered game
+        '404':
+          description: Not found
+
+  /api/trade-offers/{offerId}:
+    get:
+      summary: Get trade offer
+      parameters:
+        - name: offerId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeOffer'
+        '403':
+          description: Not involved in this offer
+        '404':
+          description: Not found
+    put:
+      summary: Accept or reject a trade offer (recipient only)
+      parameters:
+        - name: offerId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, rejected]
+      responses:
+        '204':
+          description: Updated
+        '400':
+          description: Invalid status
+        '403':
+          description: Only the recipient may respond
+        '404':
+          description: Not found
+        '409':
+          description: Offer already responded to
+
 components:
   securitySchemes:
     Bearer:
@@ -249,6 +337,37 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Game'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+    TradeOfferBody:
+      type: object
+      required: [offeredGameId, requestedGameId]
+      properties:
+        offeredGameId: { type: integer }
+        requestedGameId: { type: integer }
+    TradeOffer:
+      type: object
+      properties:
+        id: { type: integer }
+        offeredGameId: { type: integer }
+        requestedGameId: { type: integer }
+        offeringUserId: { type: integer }
+        recipientUserId: { type: integer }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+    TradeOfferList:
+      type: object
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeOffer'
         links:
           type: array
           items:
